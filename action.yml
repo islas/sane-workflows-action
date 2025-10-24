@@ -1,5 +1,9 @@
 name: sane-workflows
 description: "Run a set of actions using sane-workflows"
+branding:
+  icon: wind
+  color: green
+
 inputs:
   id:
     description: ID of workflow run, i.e. name
