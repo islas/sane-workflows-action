@@ -1,0 +1,133 @@
+name: sane-workflows
+description: "Run a set of actions using sane-workflows"
+inputs:
+  id:
+    description: ID of workflow run, i.e. name
+    required : true
+    type     : string
+  paths:
+    description: List of paths pointing to workflow(s)
+    required : true
+    type     : array
+
+  # Everything else is optional
+  host:
+    description: Specific host to run workflow as
+    required : false
+    type     : string
+    default  : ''
+  actions:
+    description: Actions list to run, mutually exclusive with actions_filter
+    required : false
+    type     : string
+    default  : '[]'
+  actions_filter:
+    description: Actions filter to run, mutually exclusive with actions
+    required : false
+    type     : string
+    default  : ''
+  args     :
+    description: Additional args to pass to sane_runner
+    required : false
+    type     : string
+    default  : ''
+  patch:
+    description: One-time patch dict allowed for modification of workflow, need be
+    required : false
+    type     : string
+    default  : ''
+  upload :
+    description: Whether to upload logs as an artifact on failure
+    required : false
+    type     : boolean
+    default  : false
+
+  # Python environment management
+  cache:
+    description: Whether to cache the python virtual environment
+    required : false
+    type     : boolean
+    default  : false
+  cache_id:
+    description: Specific cache id to use, if not set the key will be inputs.id
+    required : false
+    type     : string
+    default  : ''
+  venv:
+    description: Path to setup python virtual environment at
+    required : false
+    type     : string
+    default  : './venv/sane'
+  python_dependencies:
+    description: Extra python dependencies list needed for workflow
+    required : false
+    type     : array
+    default  : '[]'
+  upgrade:
+    description: Use pip install --upgrade when installing dependencies, not recommended with cache
+    required : false
+    type     : boolean
+    default  : true
+
+runs:
+  using: "composite"
+  steps:
+  - if: ${{ inputs.cache == 'true' }}
+    name: Cache python environment
+    id: cache-venv
+    uses: actions/cache@v3
+    with:
+      path: |
+        ${{ inputs.venv }}
+      key: venv-${{ inputs.cache_id || inputs.id }}
+
+  - if: ${{ inputs.cache == 'false' || steps.cache-venv.outputs.cache-hit != 'true' }}
+    name: Install sane-workflows
+    id  : install-sane
+    shell: bash
+    run: |
+      if [ -x "${{ inputs.venv }}/bin/activate" ]; then
+        . ${{ inputs.venv }}/bin/activate
+      else
+        python3 -m venv ${{ inputs.venv }}
+        . ${{ inputs.venv }}/bin/activate
+      fi
+
+      python3 -m pip install --no-cache-dir ${{ inputs.upgrade && '--upgrade' }} sane-workflows
+
+      if [ "${{ inputs.python_dependencies }}" != "[]" ]; then
+        python3 -m pip install --no-cache-dir ${{ inputs.upgrade && '--upgrade' }} ${{ join( fromJson( inputs.python_dependencies ), ' ' ) }}
+      fi
+
+  - name: Run ${{ inputs.id }}
+    id  : runTest
+    shell: bash
+    run: |
+      if [ ! -z "${{ inputs.action_filter }}" ]; then
+        ACTIONS="-f ${{ inputs.action_filter }}"
+      elif [ "${{ inputs.actions }}" != "[]" ]; then
+        ACTIONS="-a ${{ join( fromJson( inputs.actions ), ' ' ) }}"
+      fi
+      if [ ! -z "${{ inputs.host }}" ]; then
+        HOST="-sh ${{ inputs.host }}"
+      fi
+      if [ ! -z "${{ inputs.patch }}" ]; then
+        mkdir -p .patch-${{ inputs.id }}/
+        echo '{ "patches" : ${{ inputs.patch }} }' >> .patch-${{ inputs.id }}/patch.json
+        PATCH="-p .patch-${{ inputs.id }}/"
+      fi
+      . ${{ inputs.venv }}/bin/activate
+
+      sane_runner ${{ inputs.args }} $ACTIONS $HOST $PATCH \
+        -p ${{ join( fromJson( inputs.paths ), '-p ' ) }} \
+        -sl .${{ inputs.id }}_saves \
+        -ll  ${{ inputs.id }}_logs  \
+        -r
+
+  - if  : ${{ inputs.upload && failure() }}
+    name: Upload test logs
+    uses : actions/upload-artifact@v4
+    with:
+      name: ${{ inputs.id }}_logfiles
+      path: ${{ inputs.id }}_logs
+      include-hidden-files: true
