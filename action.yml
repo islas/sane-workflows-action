@@ -15,6 +15,11 @@ inputs:
     type     : array
 
   # Everything else is optional
+  dry_run:
+    description: Enable dry-run of tests instead
+    required   : false
+    type       : boolean
+    default    : false
   host:
     description: Specific host to run workflow as
     required : false
@@ -107,6 +112,10 @@ runs:
     id  : runTest
     shell: bash
     run: |
+      RUN_FLAG="-r"
+      if [ "${{ inputs.dry_run }}" = "true" ]; then
+        RUN_FLAG="-d"
+      fi
       if [ ! -z "${{ inputs.action_filter }}" ]; then
         ACTIONS="-f ${{ inputs.action_filter }}"
       elif [ "${{ inputs.actions }}" != "[]" ]; then
@@ -126,7 +135,7 @@ runs:
         -p ${{ join( fromJson( inputs.paths ), '-p ' ) }} \
         -sl .${{ inputs.id }}_saves \
         -ll  ${{ inputs.id }}_logs  \
-        -r
+        $RUN_FLAG
 
   - if  : ${{ inputs.upload && failure() }}
     name: Upload test logs
