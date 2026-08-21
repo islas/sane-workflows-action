@@ -116,8 +116,8 @@ runs:
       if [ "${{ inputs.dry_run }}" = "true" ]; then
         RUN_FLAG="-d"
       fi
-      if [ ! -z "${{ inputs.action_filter }}" ]; then
-        ACTIONS="-f ${{ inputs.action_filter }}"
+      if [ ! -z "${{ inputs.actions_filter }}" ]; then
+        ACTIONS="-f ${{ inputs.actions_filter }}"
       elif [ "${{ inputs.actions }}" != "[]" ]; then
         ACTIONS="-a ${{ join( fromJson( inputs.actions ), ' ' ) }}"
       fi
