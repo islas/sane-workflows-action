@@ -77,6 +77,16 @@ inputs:
     required : false
     type     : boolean
     default  : true
+  pre:
+    description: Allow pre-release in install of SANE Workflows
+    required : false
+    type     : boolean
+    default  : false
+  version:
+    description: Specify version of SANE Workflows
+    required : false
+    type     : string
+    default  : latest
 
 runs:
   using: "composite"
@@ -102,7 +112,14 @@ runs:
         . ${{ inputs.venv }}/bin/activate
       fi
 
-      python3 -m pip install --no-cache-dir ${{ inputs.upgrade && '--upgrade' }} sane-workflows
+      if [ "${{ inputs.pre }}" = "true" ]; then
+        PRE="--pre"
+      fi
+      if [ "${{ inputs.version }}" != "latest" ]; then
+        VERSION="==${{ inputs.version }}"
+      fi
+
+      python3 -m pip install --no-cache-dir ${{ inputs.upgrade && '--upgrade' }} $PRE sane-workflows$VERSION
 
       if [ "${{ inputs.python_dependencies }}" != "[]" ]; then
         python3 -m pip install --no-cache-dir ${{ inputs.upgrade && '--upgrade' }} ${{ join( fromJson( inputs.python_dependencies ), ' ' ) }}
