@@ -11,3 +11,6 @@ See `actions.yml` file for inputs. Any list or dict is expected to be input as a
 
 ## Usage
 This is just a simplified wrapper on setting up a python virtual environment and then running a workflow. The only required inputs are `id` and `paths` to note where your workflow is. This will run `sane_runner` with `-r` by default and construct the remaining options based on any other inputs you provide.
+
+## Outputs
+Two output variables are provided - `save_location` and `log_location`. These are always equal to `${{ inputs.id }}_saves/logs` (respectively) but are provided for convenience.

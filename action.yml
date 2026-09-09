@@ -88,6 +88,14 @@ inputs:
     type     : string
     default  : latest
 
+outputs:
+  save_location:
+    description: Location of workflow saves
+    value: ${{ steps.sane.outputs.save_location }}
+  log_location:
+    description: Location of workflow logs
+    value: ${{ steps.sane.outputs.log_location }}
+
 runs:
   using: "composite"
   steps:
@@ -126,7 +134,7 @@ runs:
       fi
 
   - name: Run ${{ inputs.id }}
-    id  : runTest
+    id  : sane
     shell: bash
     run: |
       RUN_FLAG="-r"
@@ -148,6 +156,9 @@ runs:
         PATCH="-p .patch-${{ inputs.id }}/"
       fi
       . ${{ inputs.venv }}/bin/activate
+
+      echo "save_location=${{ inputs.id }}_saves" >> $GITHUB_OUTPUT
+      echo "log_location=${{ inputs.id }}_logs" >> $GITHUB_OUTPUT
 
       sane_runner ${{ inputs.args }} $ACTIONS $ACTIONS_FILTER $HOST $PATCH \
         -p ${{ join( fromJson( inputs.paths ), '-p ' ) }} \
