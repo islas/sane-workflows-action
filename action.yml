@@ -26,15 +26,15 @@ inputs:
     type     : string
     default  : ''
   actions:
-    description: Actions list to run, mutually exclusive with actions_filter
+    description: Actions list to run
     required : false
     type     : string
     default  : '[]'
   actions_filter:
-    description: Actions filter to run, mutually exclusive with actions
+    description: Actions filter to run, each applied separately
     required : false
     type     : string
-    default  : ''
+    default  : '[]'
   args     :
     description: Additional args to pass to sane_runner
     required : false
@@ -133,9 +133,10 @@ runs:
       if [ "${{ inputs.dry_run }}" = "true" ]; then
         RUN_FLAG="-d"
       fi
-      if [ ! -z "${{ inputs.actions_filter }}" ]; then
-        ACTIONS="-f ${{ inputs.actions_filter }}"
-      elif [ "${{ inputs.actions }}" != "[]" ]; then
+      if [ "${{ inputs.actions_filter }}" != "[]" ]; then
+        ACTIONS_FILTER="-f ${{ join( fromJson( inputs.actions_filter ), ' -f' ) }}"
+      fi
+      if [ "${{ inputs.actions }}" != "[]" ]; then
         ACTIONS="-a ${{ join( fromJson( inputs.actions ), ' ' ) }}"
       fi
       if [ ! -z "${{ inputs.host }}" ]; then
@@ -148,7 +149,7 @@ runs:
       fi
       . ${{ inputs.venv }}/bin/activate
 
-      sane_runner ${{ inputs.args }} $ACTIONS $HOST $PATCH \
+      sane_runner ${{ inputs.args }} $ACTIONS $ACTIONS_FILTER $HOST $PATCH \
         -p ${{ join( fromJson( inputs.paths ), '-p ' ) }} \
         -sl .${{ inputs.id }}_saves \
         -ll  ${{ inputs.id }}_logs  \
