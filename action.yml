@@ -113,7 +113,7 @@ runs:
     id  : install-sane
     shell: bash
     run: |
-      if [ -x "${{ inputs.venv }}/bin/activate" ]; then
+      if [ -f "${{ inputs.venv }}/bin/activate" ]; then
         . ${{ inputs.venv }}/bin/activate
       else
         python3 -m venv ${{ inputs.venv }}
@@ -127,22 +127,25 @@ runs:
         VERSION="==${{ inputs.version }}"
       fi
 
-      python3 -m pip install --no-cache-dir ${{ inputs.upgrade && '--upgrade' }} $PRE sane-workflows$VERSION
+      python3 -m pip install --no-cache-dir ${{ inputs.upgrade == 'true' && '--upgrade' || '' }} $PRE sane-workflows$VERSION
 
       if [ "${{ inputs.python_dependencies }}" != "[]" ]; then
-        python3 -m pip install --no-cache-dir ${{ inputs.upgrade && '--upgrade' }} ${{ join( fromJson( inputs.python_dependencies ), ' ' ) }}
+        python3 -m pip install --no-cache-dir ${{ inputs.upgrade == 'true' && '--upgrade' || '' }} ${{ join( fromJson( inputs.python_dependencies ), ' ' ) }}
       fi
 
   - name: Run ${{ inputs.id }}
     id  : sane
+    env:
+      SANE_PATCH: ${{ inputs.patch }}
+      ACTIONS_FILTER: ${{ join( fromJson( inputs.actions_filter ), ' -f ' ) }}
     shell: bash
     run: |
       RUN_FLAG="-r"
       if [ "${{ inputs.dry_run }}" = "true" ]; then
         RUN_FLAG="-d"
       fi
-      if [ "${{ inputs.actions_filter }}" != "[]" ]; then
-        ACTIONS_FILTER="-f ${{ join( fromJson( inputs.actions_filter ), ' -f ' ) }}"
+      if [ -n "$ACTIONS_FILTER" ]; then
+        ACTIONS_FILTER="-f $ACTIONS_FILTER"
       fi
       if [ "${{ inputs.actions }}" != "[]" ]; then
         ACTIONS="-a ${{ join( fromJson( inputs.actions ), ' ' ) }}"
@@ -150,9 +153,9 @@ runs:
       if [ ! -z "${{ inputs.host }}" ]; then
         HOST="-sh ${{ inputs.host }}"
       fi
-      if [ ! -z "${{ inputs.patch }}" ]; then
+      if [ -n "$SANE_PATCH" ]; then
         mkdir -p .patch-${{ inputs.id }}/
-        echo '{ "patches" : ${{ inputs.patch }} }' >> .patch-${{ inputs.id }}/patch.json
+        printf '{ "patches": %s }\n' "$SANE_PATCH" > .patch-${{ inputs.id }}/patch.json
         PATCH="-p .patch-${{ inputs.id }}/"
       fi
       . ${{ inputs.venv }}/bin/activate
@@ -160,13 +163,15 @@ runs:
       echo "save_location=.${{ inputs.id }}_saves" >> $GITHUB_OUTPUT
       echo "log_location=${{ inputs.id }}_logs" >> $GITHUB_OUTPUT
 
+      # Keep regex metacharacters from expanding into matching filenames.
+      set -f
       sane_runner ${{ inputs.args }} $ACTIONS $ACTIONS_FILTER $HOST $PATCH \
         -p ${{ join( fromJson( inputs.paths ), ' -p ' ) }} \
         -sl .${{ inputs.id }}_saves \
         -ll  ${{ inputs.id }}_logs  \
         $RUN_FLAG
 
-  - if  : ${{ inputs.upload && failure() }}
+  - if  : ${{ inputs.upload == 'true' && failure() }}
     name: Upload test logs
     uses : actions/upload-artifact@v4
     with:

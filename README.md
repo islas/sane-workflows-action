@@ -17,6 +17,20 @@ Two output variables are provided: `save_location` is `.${{ inputs.id }}_saves` 
 
 ## CI
 
-[The CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and manual dispatch. It tests the local composite action on Python 3.10 and 3.13 using a sparse checkout of SANE's `demo/` directory from SANE's default branch. The composite action uses its default package version (`latest`). The action revision, upstream demo revision, and installed package version are independent.
+[The CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and manual dispatch on Python 3.10 and 3.13. It sparse-checks out SANE's `demo/` directory from its default branch, independently of the composite action revision and installed package version.
 
-Only `actual_workflow.py` is loaded, so the test needs no HPC scheduler or external services. CI selects `action_015` by ID and by regex in separate runs, verifies that its two dependencies also succeed, and checks dry-run behavior and the reported save/log paths. Failed jobs upload logs and saved state for diagnosis.
+The scenario matrix covers:
+
+- Single and multiple action IDs, single and multiple regex filters (including quotes, groups, and backslashes), and overlapping IDs/filters.
+- Multiple workflow paths, with an additional action that exists only in the second path.
+- Default action selection and automatic host discovery, plus explicit host selection.
+- Dry runs, JSON patches, extra runner arguments, and save/log outputs.
+- Expected action failures with log uploads enabled and disabled; CI downloads the enabled artifact and checks that the disabled artifact was not created.
+
+Only `actual_workflow.py` is loaded from the upstream demo. Small generated local workflows provide additional-path, default-selection, and failure cases without HPC dependencies. Assertions check the exact action set (including dependencies), saved status, and actual command output.
+
+Environment jobs cover custom virtual environments, multiple Python dependencies, `upgrade` on/off, `pre`, an explicit package version, and cache misses/hits with both default and custom cache IDs. Each job resolves the explicit version from its initial installation, without tying it to a repository revision. Cache tests save the environment, move the local copy away, and require restoration to run successfully without installing deliberately invalid dependencies.
+
+Ordinary scenarios install the default latest stable package. Multiple-filter and mixed-selection scenarios enable `pre`, because SANE 1.1.0 only honors one filter and multiple-filter support is currently in the prerelease. Failed jobs retain logs and saved state for diagnosis.
+
+Filter JSON is decoded and joined in the step environment before Bash prefixes `-f`. Quotes and regex metacharacters are preserved as data, and filename expansion is disabled. Filters must not contain literal whitespace with this scalar argument approach; use regex escapes such as `\s` or `\x20` to match spaces.

@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   demo:
@@ -16,57 +17,228 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.10', '3.13']
-        mode: [run, filter, dry-run]
+        python: [ "3.10", "3.13" ]
+        mode: [ "run", "single-filter", "complex-filters", "multiple-actions", "multiple-filters", "mixed-selection",
+                "multiple-paths", "defaults", "dry-run", "patch", "extra-args",
+                "failure-upload", "failure-no-upload" ]
     steps:
-      - name: Check out action under test
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+    - name: Check out action under test
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
 
-      - name: Check out SANE demo only
-        uses: actions/checkout@v4
-        with:
-          repository: islas/sane_workflows
-          # Use SANE's default branch independently of the action revision.
-          path: sane-demo
-          sparse-checkout: /demo/
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
+    - name: Check out SANE demo only
+      uses: actions/checkout@v4
+      with:
+        repository: islas/sane_workflows
+        # Use SANE's default branch independently of the action revision.
+        path: sane-demo
+        sparse-checkout: /demo/
+        sparse-checkout-cone-mode: false
+        persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
 
-      - name: Run demo through the local composite action
-        id: demo
-        uses: ./
-        with:
-          id: demo-${{ matrix.mode }}
-          paths: '["sane-demo/demo"]'
-          # Load only the portable echo DAG, excluding HPC/custom demo configs.
-          args: '-s actual_workflow.py'
-          host: generic
-          # action_015 depends on action_000 and action_001.
-          actions: ${{ matrix.mode == 'filter' && '[]' || '["action_015"]' }}
-          actions_filter: ${{ matrix.mode == 'filter' && '["^action_015$"]' || '[]' }}
-          dry_run: ${{ matrix.mode == 'dry-run' }}
+    - name: Prepare scenario
+      id: scenario
+      env:
+        MODE: ${{ matrix.mode }}
+      run: python .github/scripts/prepare_demo.py
 
-      - name: Verify demo results and action outputs
-        env:
-          SAVE_LOCATION: ${{ steps.demo.outputs.save_location }}
-          LOG_LOCATION: ${{ steps.demo.outputs.log_location }}
-          MODE: ${{ matrix.mode }}
-        run: python .github/scripts/verify_demo.py
+    - name: Run demo through the local composite action
+      id: demo
+      continue-on-error: ${{ fromJSON(steps.scenario.outputs.failure) }}
+      uses: ./
+      with:
+        id: demo-${{ matrix.python }}-${{ matrix.mode }}
+        paths: ${{ steps.scenario.outputs.paths }}
+        args: ${{ steps.scenario.outputs.args }}
+        host: ${{ steps.scenario.outputs.host }}
+        actions: ${{ steps.scenario.outputs.actions }}
+        actions_filter: ${{ steps.scenario.outputs.actions_filter }}
+        dry_run: ${{ steps.scenario.outputs.dry_run }}
+        patch: ${{ steps.scenario.outputs.patch }}
+        # Multiple filters require SANE's current prerelease (stable 1.1.0
+        # only accepts one). Other scenarios retain the stable default.
+        pre: ${{ steps.scenario.outputs.pre }}
+        upload: ${{ steps.scenario.outputs.upload }}
 
-      - name: Upload diagnostics on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: demo-python-${{ matrix.python }}-${{ matrix.mode }}
-          path: |
-            demo-${{ matrix.mode }}_logs/
-            .demo-${{ matrix.mode }}_saves/
-          include-hidden-files: true
-          if-no-files-found: warn
+    - name: Verify scenario and action outputs
+      if: ${{ !cancelled() && steps.demo.outcome != 'skipped' }}
+      env:
+        RUN_ID: demo-${{ matrix.python }}-${{ matrix.mode }}
+        SAVE_LOCATION: ${{ steps.demo.outputs.save_location }}
+        LOG_LOCATION: ${{ steps.demo.outputs.log_location }}
+        OUTCOME: ${{ steps.demo.outcome }}
+        MODE: ${{ matrix.mode }}
+      run: python .github/scripts/verify_demo.py
+
+    - name: Download the composite's failure artifact
+      if: matrix.mode == 'failure-upload'
+      uses: actions/download-artifact@v4
+      with:
+        name: demo-${{ matrix.python }}-${{ matrix.mode }}_logfiles
+        path: downloaded-logs
+
+    - name: Verify uploaded logs
+      if: matrix.mode == 'failure-upload'
+      run: test -s downloaded-logs/runner.log
+
+    - name: Verify upload was disabled
+      if: matrix.mode == 'failure-no-upload'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        ARTIFACT_NAME: demo-${{ matrix.python }}-${{ matrix.mode }}_logfiles
+      run: |
+        gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+          --jq '.artifacts[].name' > artifact-names.txt
+        if grep -Fxq "$ARTIFACT_NAME" artifact-names.txt; then
+          echo 'The composite uploaded logs despite upload=false'
+          exit 1
+        fi
+
+    - name: Upload diagnostics on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: demo-python-${{ matrix.python }}-${{ matrix.mode }}
+        path: |
+          demo-${{ matrix.python }}-${{ matrix.mode }}_logs/
+          .demo-${{ matrix.python }}-${{ matrix.mode }}_saves/
+        include-hidden-files: true
+        if-no-files-found: warn
+
+  environment:
+    name: Environment / Python ${{ matrix.python }} / ${{ matrix.cache-key }} cache key
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python: [ "3.10", "3.13" ]
+        cache-key: [ "default", "custom" ]
+    env:
+      CACHE_ID: env-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.python }}-${{ matrix.cache-key }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python }}
+    - name: Prepare portable workflows
+      run: python .github/scripts/prepare_demo.py
+
+    - name: Install into custom virtual environment on cache miss
+      id: install
+      uses: ./
+      with:
+        id: ${{ env.CACHE_ID }}
+        paths: '["ci-fixtures/defaults"]'
+        venv: .ci-venv
+        cache: 'true'
+        cache_id: ${{ matrix.cache-key == 'custom' && format('custom-{0}', env.CACHE_ID) || '' }}
+        python_dependencies: '["packaging==24.0", "six==1.16.0"]'
+        upgrade: 'false'
+
+    - name: Verify dependencies and capture installed SANE version
+      id: version
+      run: |
+        .ci-venv/bin/python - <<'PY'
+        import os
+        from importlib.metadata import version
+        assert version( "packaging" ) == "24.0"
+        assert version( "six" ) == "1.16.0"
+        with open( os.environ["GITHUB_OUTPUT"], "a" ) as output:
+          print( "sane=" + version( "sane-workflows" ), file=output )
+        PY
+
+    - name: Reuse venv with explicit version, prereleases allowed, and no upgrade
+      uses: ./
+      with:
+        id: explicit-version
+        paths: '["ci-fixtures/defaults"]'
+        venv: .ci-venv
+        version: ${{ steps.version.outputs.sane }}
+        pre: 'true'
+        upgrade: 'false'
+        python_dependencies: '["packaging", "six"]'
+
+    - name: Verify no-upgrade preserved installed dependencies
+      env:
+        EXPECTED_SANE: ${{ steps.version.outputs.sane }}
+      run: |
+        .ci-venv/bin/python - <<'PY'
+        import os
+        from importlib.metadata import version
+        assert version( "sane-workflows" ) == os.environ["EXPECTED_SANE"]
+        assert version( "packaging" ) == "24.0"
+        assert version( "six" ) == "1.16.0"
+        PY
+
+    - name: Upgrade dependencies in existing venv
+      uses: ./
+      with:
+        id: upgrade
+        paths: '["ci-fixtures/defaults"]'
+        venv: .ci-venv
+        upgrade: 'true'
+        python_dependencies: '["packaging", "six"]'
+
+    - name: Verify upgrade and create cache sentinel
+      run: |
+        .ci-venv/bin/python - <<'PY'
+        from importlib.metadata import version
+        from packaging.version import Version
+        assert Version( version( "packaging" ) ) >= Version( "25" )
+        assert Version( version( "six" ) ) >= Version( "1.17" )
+        PY
+        echo restored > .ci-venv/ci-cache-sentinel
+
+    # Save now: the composite's normal cache save happens at job teardown.
+    - name: Save cache for an immediate restore test
+      uses: actions/cache/save@v3
+      with:
+        path: .ci-venv
+        key: venv-${{ matrix.cache-key == 'custom' && format('custom-{0}', env.CACHE_ID) || env.CACHE_ID }}
+
+    - name: Move venv away to require a real cache restore
+      run: mv .ci-venv "$RUNNER_TEMP/ci-venv-before-restore"
+
+    - name: Restore cache and skip installation
+      id: restore
+      uses: ./
+      with:
+        id: ${{ env.CACHE_ID }}
+        paths: '["ci-fixtures/defaults"]'
+        args: --new
+        venv: .ci-venv
+        cache: 'true'
+        cache_id: ${{ matrix.cache-key == 'custom' && format('custom-{0}', env.CACHE_ID) || '' }}
+        # Installation must be skipped on a hit; these cannot be installed.
+        version: '0.0.0-ci-cache-must-skip-install'
+        python_dependencies: '["sane-ci-cache-must-skip-install==0"]'
+
+    - name: Verify restored environment and run results
+      env:
+        RUN_ID: ${{ env.CACHE_ID }}
+        SAVE_LOCATION: ${{ steps.restore.outputs.save_location }}
+        LOG_LOCATION: ${{ steps.restore.outputs.log_location }}
+        OUTCOME: ${{ steps.restore.outcome }}
+        MODE: defaults
+      run: |
+        test "$(cat .ci-venv/ci-cache-sentinel)" = restored
+        python .github/scripts/verify_demo.py
+
+    - name: Upload environment diagnostics on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: environment-${{ matrix.python }}-${{ matrix.cache-key }}
+        path: |
+          *_logs/
+          .*_saves/
+        include-hidden-files: true
