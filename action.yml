@@ -142,7 +142,7 @@ runs:
         RUN_FLAG="-d"
       fi
       if [ "${{ inputs.actions_filter }}" != "[]" ]; then
-        ACTIONS_FILTER="-f ${{ join( fromJson( inputs.actions_filter ), ' -f' ) }}"
+        ACTIONS_FILTER="-f ${{ join( fromJson( inputs.actions_filter ), ' -f ' ) }}"
       fi
       if [ "${{ inputs.actions }}" != "[]" ]; then
         ACTIONS="-a ${{ join( fromJson( inputs.actions ), ' ' ) }}"
@@ -161,7 +161,7 @@ runs:
       echo "log_location=${{ inputs.id }}_logs" >> $GITHUB_OUTPUT
 
       sane_runner ${{ inputs.args }} $ACTIONS $ACTIONS_FILTER $HOST $PATCH \
-        -p ${{ join( fromJson( inputs.paths ), '-p ' ) }} \
+        -p ${{ join( fromJson( inputs.paths ), ' -p ' ) }} \
         -sl .${{ inputs.id }}_saves \
         -ll  ${{ inputs.id }}_logs  \
         $RUN_FLAG
