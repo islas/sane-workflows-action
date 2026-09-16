@@ -1,0 +1,72 @@
+name: Test composite action
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  demo:
+    name: Demo / Python ${{ matrix.python }} / ${{ matrix.mode }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.13']
+        mode: [run, filter, dry-run]
+    steps:
+      - name: Check out action under test
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check out SANE demo only
+        uses: actions/checkout@v4
+        with:
+          repository: islas/sane_workflows
+          # Use SANE's default branch independently of the action revision.
+          path: sane-demo
+          sparse-checkout: /demo/
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Run demo through the local composite action
+        id: demo
+        uses: ./
+        with:
+          id: demo-${{ matrix.mode }}
+          paths: '["sane-demo/demo"]'
+          # Load only the portable echo DAG, excluding HPC/custom demo configs.
+          args: '-s actual_workflow.py'
+          host: generic
+          # action_015 depends on action_000 and action_001.
+          actions: ${{ matrix.mode == 'filter' && '[]' || '["action_015"]' }}
+          actions_filter: ${{ matrix.mode == 'filter' && '["^action_015$"]' || '[]' }}
+          dry_run: ${{ matrix.mode == 'dry-run' }}
+
+      - name: Verify demo results and action outputs
+        env:
+          SAVE_LOCATION: ${{ steps.demo.outputs.save_location }}
+          LOG_LOCATION: ${{ steps.demo.outputs.log_location }}
+          MODE: ${{ matrix.mode }}
+        run: python .github/scripts/verify_demo.py
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-python-${{ matrix.python }}-${{ matrix.mode }}
+          path: |
+            demo-${{ matrix.mode }}_logs/
+            .demo-${{ matrix.mode }}_saves/
+          include-hidden-files: true
+          if-no-files-found: warn
