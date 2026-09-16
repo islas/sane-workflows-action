@@ -10,6 +10,9 @@ mode   = os.environ["MODE"]
 config = scenario( mode )
 run_id = os.environ["RUN_ID"]
 assert os.environ["OUTCOME"] == ( "failure" if config["failure"] else "success" )
+# Expected failures must be tolerated by the workflow, not just match SANE's state.
+if "CONCLUSION" in os.environ:
+  assert os.environ["CONCLUSION"] == "success", os.environ["CONCLUSION"]
 
 # Failed composite steps may not publish outputs; still inspect their saved results.
 if not config["failure"]:

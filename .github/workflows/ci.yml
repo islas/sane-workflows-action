@@ -50,7 +50,9 @@ jobs:
 
     - name: Run demo through the local composite action
       id: demo
-      continue-on-error: ${{ fromJSON(steps.scenario.outputs.failure) }}
+      # Composite actions change the steps context; use the stable matrix context
+      # here, then require the expected outcome in the verification step below.
+      continue-on-error: ${{ matrix.mode == 'failure-upload' || matrix.mode == 'failure-no-upload' }}
       uses: ./
       with:
         id: demo-${{ matrix.python }}-${{ matrix.mode }}
@@ -73,6 +75,7 @@ jobs:
         SAVE_LOCATION: ${{ steps.demo.outputs.save_location }}
         LOG_LOCATION: ${{ steps.demo.outputs.log_location }}
         OUTCOME: ${{ steps.demo.outcome }}
+        CONCLUSION: ${{ steps.demo.conclusion }}
         MODE: ${{ matrix.mode }}
       run: python .github/scripts/verify_demo.py
 
