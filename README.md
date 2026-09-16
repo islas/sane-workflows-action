@@ -13,4 +13,10 @@ See `actions.yml` file for inputs. Any list or dict is expected to be input as a
 This is just a simplified wrapper on setting up a python virtual environment and then running a workflow. The only required inputs are `id` and `paths` to note where your workflow is. This will run `sane_runner` with `-r` by default and construct the remaining options based on any other inputs you provide.
 
 ## Outputs
-Two output variables are provided - `save_location` and `log_location`. These are always equal to `${{ inputs.id }}_saves/logs` (respectively) but are provided for convenience.
+Two output variables are provided: `save_location` is `.${{ inputs.id }}_saves` (a hidden directory), and `log_location` is `${{ inputs.id }}_logs`.
+
+## CI
+
+[The CI workflow](.github/workflows/ci.yml) runs on pushes, pull requests, and manual dispatch. It tests the local composite action on Python 3.10 and 3.13 using a sparse checkout of SANE's `demo/` directory from SANE's default branch. The composite action uses its default package version (`latest`). The action revision, upstream demo revision, and installed package version are independent.
+
+Only `actual_workflow.py` is loaded, so the test needs no HPC scheduler or external services. CI selects `action_015` by ID and by regex in separate runs, verifies that its two dependencies also succeed, and checks dry-run behavior and the reported save/log paths. Failed jobs upload logs and saved state for diagnosis.
