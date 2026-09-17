@@ -12,6 +12,11 @@ See `actions.yml` file for inputs. Any list or dict is expected to be input as a
 ## Usage
 This is just a simplified wrapper on setting up a python virtual environment and then running a workflow. The only required inputs are `id` and `paths` to note where your workflow is. This will run `sane_runner` with `-r` by default and construct the remaining options based on any other inputs you provide.
 
+## Log uploads
+
+Set `upload` to one of these strings (`none`, `always`, `on_failure`) to control when workflow artifacts are uploaded
+
+
 ## Outputs
 Two output variables are provided: `save_location` is `.${{ inputs.id }}_saves` (a hidden directory), and `log_location` is `${{ inputs.id }}_logs`.
 
@@ -25,7 +30,7 @@ The scenario matrix covers:
 - Multiple workflow paths, with an additional action that exists only in the second path.
 - Default action selection and automatic host discovery, plus explicit host selection.
 - Dry runs, JSON patches, extra runner arguments, and save/log outputs.
-- Expected action failures with log uploads enabled and disabled; CI downloads the enabled artifact and checks that the disabled artifact was not created.
+- All three upload policies on both successful and failed runs; CI downloads expected artifacts and checks that no artifact was created otherwise. Invalid policies (including the old boolean values) must fail before installation.
 
 Only `actual_workflow.py` is loaded from the upstream demo. Small generated local workflows provide additional-path, default-selection, and failure cases without HPC dependencies. Assertions check the exact action set (including dependencies), saved status, and actual command output.
 

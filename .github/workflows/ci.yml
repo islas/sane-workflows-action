@@ -20,7 +20,8 @@ jobs:
         python: [ "3.10", "3.13" ]
         mode: [ "run", "single-filter", "complex-filters", "multiple-actions", "multiple-filters", "mixed-selection",
                 "multiple-paths", "defaults", "dry-run", "patch", "extra-args",
-                "failure-upload", "failure-no-upload" ]
+                "success-none", "success-always", "success-on-failure",
+                "failure-upload", "failure-no-upload", "failure-always" ]
     steps:
     - name: Check out action under test
       uses: actions/checkout@v4
@@ -52,7 +53,7 @@ jobs:
       id: demo
       # Composite actions change the steps context; use the stable matrix context
       # here, then require the expected outcome in the verification step below.
-      continue-on-error: ${{ matrix.mode == 'failure-upload' || matrix.mode == 'failure-no-upload' }}
+      continue-on-error: ${{ startsWith( matrix.mode, 'failure-' ) }}
       uses: ./
       with:
         id: demo-${{ matrix.python }}-${{ matrix.mode }}
@@ -79,19 +80,19 @@ jobs:
         MODE: ${{ matrix.mode }}
       run: python .github/scripts/verify_demo.py
 
-    - name: Download the composite's failure artifact
-      if: matrix.mode == 'failure-upload'
+    - name: Download the composite's log artifact
+      if: steps.scenario.outputs.expect_upload == 'true'
       uses: actions/download-artifact@v4
       with:
         name: demo-${{ matrix.python }}-${{ matrix.mode }}_logfiles
         path: downloaded-logs
 
     - name: Verify uploaded logs
-      if: matrix.mode == 'failure-upload'
+      if: steps.scenario.outputs.expect_upload == 'true'
       run: test -s downloaded-logs/runner.log
 
     - name: Verify upload was disabled
-      if: matrix.mode == 'failure-no-upload'
+      if: steps.scenario.outputs.expect_upload == 'false'
       env:
         GH_TOKEN: ${{ github.token }}
         ARTIFACT_NAME: demo-${{ matrix.python }}-${{ matrix.mode }}_logfiles
@@ -99,7 +100,7 @@ jobs:
         gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
           --jq '.artifacts[].name' > artifact-names.txt
         if grep -Fxq "$ARTIFACT_NAME" artifact-names.txt; then
-          echo 'The composite uploaded logs despite upload=false'
+          echo 'The composite uploaded logs when the policy required no upload'
           exit 1
         fi
 
@@ -245,3 +246,36 @@ jobs:
           *_logs/
           .*_saves/
         include-hidden-files: true
+
+  invalid-upload:
+    name: Reject upload=${{ matrix.upload }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        upload: [ "true", "false", "sometimes" ]
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+
+    - name: Reject an unsupported upload policy
+      id: invalid
+      continue-on-error: true
+      uses: ./
+      with:
+        id: invalid-upload
+        paths: '["unused-workflow"]'
+        upload: ${{ matrix.upload }}
+        venv: .invalid-upload-venv
+
+    - name: Verify validation failed before installation or execution
+      env:
+        OUTCOME: ${{ steps.invalid.outcome }}
+        CONCLUSION: ${{ steps.invalid.conclusion }}
+      run: |
+        test "$OUTCOME" = failure
+        test "$CONCLUSION" = success
+        test ! -e .invalid-upload-venv
+        test ! -e invalid-upload_logs

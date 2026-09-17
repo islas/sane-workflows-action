@@ -46,10 +46,10 @@ inputs:
     type     : string
     default  : ''
   upload :
-    description: Whether to upload logs as an artifact on failure
+    description: When to upload logs as an artifact (none, always, or on_failure)
     required : false
-    type     : boolean
-    default  : false
+    type     : string
+    default  : 'on_failure'
 
   # Python environment management
   cache:
@@ -99,6 +99,19 @@ outputs:
 runs:
   using: "composite"
   steps:
+  - name: Validate upload policy
+    shell: bash
+    env:
+      UPLOAD_POLICY: ${{ inputs.upload }}
+    run: |
+      case "$UPLOAD_POLICY" in
+        none|always|on_failure) ;;
+        *)
+          echo '::error::upload must be one of: none, always, on_failure'
+          exit 1
+          ;;
+      esac
+
   - if: ${{ inputs.cache == 'true' }}
     name: Cache python environment
     id: cache-venv
@@ -171,7 +184,7 @@ runs:
         -ll  ${{ inputs.id }}_logs  \
         $RUN_FLAG
 
-  - if  : ${{ inputs.upload == 'true' && failure() }}
+  - if  : ${{ always() && (inputs.upload == 'always' || (inputs.upload == 'on_failure' && failure())) }}
     name: Upload test logs
     uses : actions/upload-artifact@v4
     with:

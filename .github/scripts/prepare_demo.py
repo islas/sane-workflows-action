@@ -54,15 +54,29 @@ CASES = {
     }
   },
   "extra-args" : { "args" : "-s actual_workflow.py --new -ml custom-runner.log" },
+  "success-none" : { "upload" : "none" },
+  "success-always" : { "upload" : "always", "expect_upload" : True },
+  "success-on-failure" : { "upload" : "on_failure" },
+  "failure-always" : {
+    "actions" : [ "ci_failure" ],
+    "paths" : [ "ci-fixtures/failure" ],
+    "args" : "",
+    "upload" : "always",
+    "expect_upload" : True,
+    "expected" : [ "ci_failure" ],
+    "failure" : True
+  },
   "failure-upload" : {
     "actions" : [ "ci_failure" ],
     "paths" : [ "ci-fixtures/failure" ],
     "args" : "",
-    "upload" : True,
+    "upload" : "on_failure",
+    "expect_upload" : True,
     "expected" : [ "ci_failure" ],
     "failure" : True
   },
   "failure-no-upload" : {
+    "upload" : "none",
     "actions" : [ "ci_failure" ],
     "paths" : [ "ci-fixtures/failure" ],
     "args" : "",
@@ -83,7 +97,8 @@ def scenario( name ):
                   "patch" : "",
                   "dry_run" : False,
                   "pre" : False,
-                  "upload" : False,
+                  "upload" : "none",
+                  "expect_upload" : False,
                   "expected" : BASE,
                   "failure" : False
                 },
