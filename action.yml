@@ -184,7 +184,29 @@ runs:
         -ll  ${{ inputs.id }}_logs  \
         $RUN_FLAG
 
-  - if  : ${{ always() && (inputs.upload == 'always' || (inputs.upload == 'on_failure' && failure())) }}
+  - if: always()
+    name: Summary
+    shell: bash
+    run: |
+      set +e
+      set -o pipefail
+      . ${{ inputs.venv }}/bin/activate
+
+      sane_view summary --markdown .${{ inputs.id }}_saves >> $GITHUB_STEP_SUMMARY
+      # Do command-line friendly view
+      sane_view summary            .${{ inputs.id }}_saves
+
+      if [ $? -ne 0 ]; then
+        echo "Error logs:" | tee -a $GITHUB_STEP_SUMMARY
+        sane_view logs --errors --relative_path --markdown .${{ inputs.id }}_saves >> $GITHUB_STEP_SUMMARY
+        sane_view logs --errors --relative_path            .${{ inputs.id }}_saves
+        if [ "${{ inputs.upload }}" = "always" ] || [ "${{ inputs.upload }}" = "on_failure" ]; then
+          echo "See uploaded artifacts for full logs" | tee -a $GITHUB_STEP_SUMMARY
+        fi
+        echo "::error::Workflow failed with $(sane_view summary .${{ inputs.id }}_saves | grep Errors | awk '{print $3}') errors"
+      fi
+
+  - if: ${{ always() && (inputs.upload == 'always' || (inputs.upload == 'on_failure' && failure())) }}
     name: Upload test logs
     uses : actions/upload-artifact@v7
     with:
