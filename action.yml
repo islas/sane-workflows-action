@@ -153,6 +153,8 @@ runs:
       ACTIONS_FILTER: ${{ join( fromJson( inputs.actions_filter ), ' -f ' ) }}
     shell: bash
     run: |
+      set +e
+
       RUN_FLAG="-r"
       if [ "${{ inputs.dry_run }}" = "true" ]; then
         RUN_FLAG="-d"
@@ -183,6 +185,11 @@ runs:
         -sl .${{ inputs.id }}_saves \
         -ll  ${{ inputs.id }}_logs  \
         $RUN_FLAG
+
+      if [ $? -ne 0 ]; then
+        # Let the summary report the failure to the calling job
+        echo "WORKFLOW FAILURE"
+      fi
 
   - if: always()
     name: Summary
