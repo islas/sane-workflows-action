@@ -211,6 +211,7 @@ runs:
           echo -e "\n**See uploaded artifacts for full logs**" | tee -a $GITHUB_STEP_SUMMARY
         fi
         echo "::error::Workflow failed with $(sane_view summary .${{ inputs.id }}_saves | grep Errors | awk '{print $3}') errors"
+        exit 1
       fi
 
   - if: ${{ always() && (inputs.upload == 'always' || (inputs.upload == 'on_failure' && failure())) }}
