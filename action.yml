@@ -224,5 +224,5 @@ runs:
     uses : actions/upload-artifact@v7
     with:
       name: ${{ format( inputs.artifact_string, inputs.id ) }}
-      path: ${{ inputs.id }}_logs
+      path: ${{ inputs.id }}_logs/*.log
       include-hidden-files: true
