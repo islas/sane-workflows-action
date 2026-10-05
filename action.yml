@@ -50,6 +50,11 @@ inputs:
     required : false
     type     : string
     default  : 'on_failure'
+  artifact_string:
+    description: Formatted artifact string to use, {0} is replaced with id
+    required : false
+    type     : string
+    default  : '{0}_logfiles'
 
   # Python environment management
   cache:
@@ -218,6 +223,6 @@ runs:
     name: Upload test logs
     uses : actions/upload-artifact@v7
     with:
-      name: ${{ inputs.id }}_logfiles
+      name: ${{ format( inputs.artifact_string, inputs.id ) }}
       path: ${{ inputs.id }}_logs
       include-hidden-files: true
