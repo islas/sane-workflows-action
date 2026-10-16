@@ -36,7 +36,7 @@ inputs:
     type     : string
     default  : '[]'
   args     :
-    description: Additional args to pass to sane_runner
+    description: Additional args to pass to sane workflow
     required : false
     type     : string
     default  : ''
@@ -185,7 +185,7 @@ runs:
 
       # Keep regex metacharacters from expanding into matching filenames.
       set -f
-      sane_runner ${{ inputs.args }} $ACTIONS $ACTIONS_FILTER $HOST $PATCH \
+      sane workflow ${{ inputs.args }} $ACTIONS $ACTIONS_FILTER $HOST $PATCH \
         -p ${{ join( fromJson( inputs.paths ), ' -p ' ) }} \
         -sl .${{ inputs.id }}_saves \
         -ll  ${{ inputs.id }}_logs  \
@@ -204,18 +204,18 @@ runs:
       set -o pipefail
       . ${{ inputs.venv }}/bin/activate
 
-      sane_view summary --markdown .${{ inputs.id }}_saves >> $GITHUB_STEP_SUMMARY
+      sane view summary --markdown .${{ inputs.id }}_saves >> $GITHUB_STEP_SUMMARY
       # Do command-line friendly view
-      sane_view summary            .${{ inputs.id }}_saves
+      sane view summary            .${{ inputs.id }}_saves
 
       if [ $? -ne 0 ]; then
         echo -e "\nError logs:" | tee -a $GITHUB_STEP_SUMMARY
-        sane_view logs --errors --relative_path --markdown .${{ inputs.id }}_saves >> $GITHUB_STEP_SUMMARY
-        sane_view logs --errors --relative_path            .${{ inputs.id }}_saves
+        sane view logs --errors --relative_path --markdown .${{ inputs.id }}_saves >> $GITHUB_STEP_SUMMARY
+        sane view logs --errors --relative_path            .${{ inputs.id }}_saves
         if [ "${{ inputs.upload }}" = "always" ] || [ "${{ inputs.upload }}" = "on_failure" ]; then
           echo -e "\n**See uploaded artifacts for full logs**" | tee -a $GITHUB_STEP_SUMMARY
         fi
-        echo "::error::Workflow failed with $(sane_view summary .${{ inputs.id }}_saves | grep Errors | awk '{print $3}') errors"
+        echo "::error::Workflow failed with $(sane view summary .${{ inputs.id }}_saves | grep Errors | awk '{print $3}') errors"
         exit 1
       fi
 
