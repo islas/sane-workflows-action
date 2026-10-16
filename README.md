@@ -36,6 +36,6 @@ Only `actual_workflow.py` is loaded from the upstream demo. Small generated loca
 
 Environment jobs cover custom virtual environments, multiple Python dependencies, `upgrade` on/off, `pre`, an explicit package version, and cache misses/hits with both default and custom cache IDs. Each job resolves the explicit version from its initial installation, without tying it to a repository revision. Cache tests save the environment, move the local copy away, and require restoration to run successfully without installing deliberately invalid dependencies.
 
-Ordinary scenarios install the default latest stable package. Multiple-filter and mixed-selection scenarios enable `pre`, because SANE 1.1.0 only honors one filter and multiple-filter support is currently in the prerelease. Failed jobs retain logs and saved state for diagnosis.
+All demo scenarios install the default latest stable package. SANE 1.2.0 supports multiple filters without enabling prereleases. Failed jobs retain logs and saved state for diagnosis.
 
 Filter JSON is decoded and joined in the step environment before Bash prefixes `-f`. Quotes and regex metacharacters are preserved as data, and filename expansion is disabled. Filters must not contain literal whitespace with this scalar argument approach; use regex escapes such as `\s` or `\x20` to match spaces.

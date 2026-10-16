@@ -12,7 +12,6 @@ CASES = {
     "actions_filter" : [ "^action_015$" ]
   },
   "complex-filters" : {
-    "pre" : True,
     "actions" : [],
     "actions_filter" : [ r'''^(?:action_0(?:15|16))$(?#quotes"')''', r"^action_00\d$" ],
     "expected" : [ f"action_{i:03d}" for i in range( 10 ) ] + [ "action_015", "action_016" ]
@@ -22,13 +21,11 @@ CASES = {
     "expected" : BASE + [ "action_002", "action_016" ]
   },
   "multiple-filters" : {
-    "pre" : True,
     "actions" : [],
     "actions_filter" : [ "^action_015$", "^action_016$" ],
     "expected" : BASE + [ "action_002", "action_016" ]
   },
   "mixed-selection" : {
-    "pre" : True,
     "actions" : [ "action_015" ],
     "actions_filter" : [ "^action_015$", "^action_016$" ],
     "expected" : BASE + [ "action_002", "action_016" ]
@@ -96,7 +93,6 @@ def scenario( name ):
                   "args" : "-s actual_workflow.py -s workflow.json -s patch.json",
                   "patch" : "",
                   "dry_run" : False,
-                  "pre" : False,
                   "upload" : "none",
                   "expect_upload" : False,
                   "expected" : BASE,

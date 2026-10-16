@@ -175,7 +175,7 @@ runs:
       fi
       if [ -n "$SANE_PATCH" ]; then
         mkdir -p .patch-${{ inputs.id }}/
-        printf '{ "patches": %s }\n' "$SANE_PATCH" > .patch-${{ inputs.id }}/patch.json
+        printf '{ "patches": [ %s ] }\n' "$SANE_PATCH" > .patch-${{ inputs.id }}/patch.json
         PATCH="-p .patch-${{ inputs.id }}/"
       fi
       . ${{ inputs.venv }}/bin/activate

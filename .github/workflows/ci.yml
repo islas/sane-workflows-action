@@ -64,9 +64,6 @@ jobs:
         actions_filter: ${{ steps.scenario.outputs.actions_filter }}
         dry_run: ${{ steps.scenario.outputs.dry_run }}
         patch: ${{ steps.scenario.outputs.patch }}
-        # Multiple filters require SANE's current prerelease (stable 1.1.0
-        # only accepts one). Other scenarios retain the stable default.
-        pre: ${{ steps.scenario.outputs.pre }}
         upload: ${{ steps.scenario.outputs.upload }}
 
     - name: Verify scenario and action outputs
