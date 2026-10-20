@@ -6,7 +6,7 @@ This is a simple action to facilitate running SANE Workflows, but can also be us
 See `actions.yml` file for inputs. Any list or dict is expected to be input as a JSON string
 
 ## Requirements
- * Your project uses [sane_workflows](https://github.com/islas/sane_workflows)
+ * Your project uses [sane_workflows](https://github.com/NCAR/sane_workflows)
  * Your workflows can be initiated in a python environment that `venv` can support (e.g. `pyvenv` not supported)
 
 ## Usage
